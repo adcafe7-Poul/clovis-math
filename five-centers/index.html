@@ -188,7 +188,7 @@ footer{text-align:center; margin-top:16px; color:var(--muted); font-family:var(-
 
 /* ── 전역 상태 및 좌표계 ─────────────────────────────── */
 const W=1200, H=720, U=70, OX=600, OY=360;
-let zoom=1.0, targetZoom=1.0; const ZMIN=0.4, ZMAX=2.4;
+let zoom=1.0, targetZoom=1.0, fitPending=false; const ZMIN=0.2, ZMAX=2.4;
 const toPx = p => [OX + p[0]*U*zoom, OY - p[1]*U*zoom];
 const toU  = (px,py) => [(px-OX)/(U*zoom), (OY-py)/(U*zoom)];
 
@@ -489,6 +489,20 @@ function drawIncenter(g, ph, T) {
         if(arc2L>0.8) udot(crossP, 3, INK, 0, clamp((arc2L-0.8)*5)*auxFade);
       }
     }
+    // 이등분된 두 내각이 서로 같음 — 같은 반지름 소호 + 같은 개수 눈금 (꼭짓점마다 1·2·3개, 페이드 없이 유지)
+    const mkL = ph(tB+1.7, tB+2.3);
+    if(mkL>0){
+      const w=norm(sub(g.I, pt.v));
+      const u1=norm(sub(pt.s1, pt.v)), u2=norm(sub(pt.s2, pt.v));
+      const rm=r1*0.62;
+      angleMark(pt.v,u1,w,rm,pt.c,mkL,0.95);
+      angleMark(pt.v,w,u2,rm,pt.c,mkL,0.95);
+      if(mkL>0.6){
+        const tA=0.95*clamp((mkL-0.6)/0.4);
+        angleTicks(pt.v,norm(add(u1,w)),rm,i+1,pt.c,tA);
+        angleTicks(pt.v,norm(add(w,u2)),rm,i+1,pt.c,tA);
+      }
+    }
     const lineL = ph(tB+2.0, tB+3.0);
     if(lineL>0){
       const Ta = getIso(pt.v, sub(g.I, pt.v), pt.s1, sub(pt.s2, pt.s1));   // 이등분선이 대변과 만나는 점
@@ -682,10 +696,11 @@ function drawExcenter(g, ph, T) {
   });
   // 방심 3개 — 외각 이등분선의 쌍별 교점에서 삼연속 번쩍
   const EX=[
-    {c0:g.IA, col:GREEN,  gl:GREENG,  r:g.rA, lab:'A', tp:19.7,  dx:20},
-    {c0:g.IB, col:PURPLE, gl:PURPLEG, r:g.rB, lab:'B', tp:20.15, dx:-42},
-    {c0:g.IC, col:ROSE,   gl:ROSEG,   r:g.rC, lab:'C', tp:20.6,  dx:20}
+    {c0:g.IA, col:GREEN,  gl:GREENG,  r:g.rA, lab:'A', tp:19.7,  dx:20,  li:0},
+    {c0:g.IB, col:PURPLE, gl:PURPLEG, r:g.rB, lab:'B', tp:20.15, dx:-42, li:2},
+    {c0:g.IC, col:ROSE,   gl:ROSEG,   r:g.rC, lab:'C', tp:20.6,  dx:20,  li:1}
   ];
+  const TL=[[g.B,g.C],[g.A,g.B],[g.C,g.A]];   // 접선 3개 — 변 BC·AB·CA(연장 포함 직선)
   EX.forEach((e,i)=>{
     if(T>=e.tp){
       const sc=popScale(T-e.tp,0.5);
@@ -695,6 +710,19 @@ function drawExcenter(g, ph, T) {
     }
     const cL=ph(21.6+i*1.0,24.6+i*1.0);
     if(cL>0) drawCircle(e.c0,e.r,cL,e.col,e.gl);
+    // 방접원 반지름 — 중심에서 세 접선(변·연장선)에 내린 수선 + 직각표시 + r 라벨
+    const rTan=ph(24.7+i*1.0, 26.0+i*1.0);
+    if(rTan>0){
+      TL.forEach(([P,Q])=>{
+        const F=proj(e.c0,P,Q);
+        dashedLine(e.c0, lerp(e.c0,F,rTan), 0.95, e.col);
+        if(rTan>0.8) drawRightAngle(F, P, e.c0, 1, INK2);
+      });
+      if(rTan>0.6){
+        const F0=proj(e.c0,TL[e.li][0],TL[e.li][1]);
+        subLabel('r', e.lab, mid(e.c0,F0), 8, -12, {color:e.col, size:16, blur:6, glow:e.gl, alpha:clamp((rTan-0.6)/0.3)});
+      }
+    }
   });
 }
 
@@ -705,8 +733,8 @@ function draw(){
   ctx.clearRect(0,0,W,H); ctx.drawImage(paper,0,0,W,H); drawGrid();
 
   const g = geom();
-  // 자동 줌아웃 — 방심·수심 모드에서 핵심 점들이 모두 화면에 들어오도록 (드래그에도 추종)
-  if(mode==='ex' || mode==='ortho'){
+  // 자동 줌아웃 — 방심·수심 진입/리셋/드래그 때 한 번만 맞추고, 이후엔 휠 줌 자유
+  if((mode==='ex' || mode==='ortho') && (fitPending || dragIdx>=0)){
     const FITMIN=0.2;
     const pts = mode==='ex' ? [g.IA,g.IB,g.IC,g.A,g.B,g.C] : [g.H,g.fA,g.fB,g.fC,g.A,g.B,g.C];
     let need=1.0;
@@ -714,6 +742,7 @@ function draw(){
       need=Math.min(need, (W/2-60)/Math.max(1e-9,Math.abs(P[0])*U), (H/2-60)/Math.max(1e-9,Math.abs(P[1])*U));
     }
     targetZoom=Math.max(FITMIN, Math.min(1, need));
+    fitPending=false;
   }
   const lift = ph(5.0, 5.8);
   if(lift>0){
@@ -804,9 +833,10 @@ function switchMode(m) {
     setCardAcc('--claude', '--claudeG'); DUR = 24.0;
   } else {
     titleAcc.style.color='var(--green)'; titleAcc.textContent='방심 3개 (Excenters)'; subEl.textContent='변의 연장선 위에서 외각을 컴퍼스로 이등분하고(같은 각 표시), 세 외각이등분선이 쌍쌍이 만나 방심 3개와 방접원을 이루오.';
-    setCardAcc('--green', '--greenG'); DUR = 28.0; targetZoom = 0.55;
+    setCardAcc('--green', '--greenG'); DUR = 30.0; targetZoom = 0.55;
   }
 
+  fitPending=(m==='ex'||m==='ortho');   // 진입 시 1회 자동 맞춤, 이후 휠 줌 자유
   setMode(true); buildT=0; holdT=0;   // 삼각형은 유지 — 드래그한 모양 그대로 다른 심을 관찰
 }
 
@@ -815,7 +845,7 @@ const buildSlider=$('build'), speedSlider=$('speed');
 function setMode(auto){ playing=auto; $('playBtn').textContent=playing?'⏸ 멈춤':'▶ 재생'; refreshBadge(); }
 function refreshBadge(){ const b=$('badge'); b.textContent=playing?'자동 작도':'수동 조작'; b.classList.toggle('auto',playing); }
 $('playBtn').addEventListener('click',()=>setMode(!playing));
-$('resetBtn').addEventListener('click',()=>{ tri=DEFAULT.map(p=>p.slice()); targetZoom=(mode==='ex')?0.55:1.0; setMode(true); buildT=0; holdT=0; });
+$('resetBtn').addEventListener('click',()=>{ tri=DEFAULT.map(p=>p.slice()); targetZoom=(mode==='ex')?0.55:1.0; fitPending=(mode==='ex'||mode==='ortho'); setMode(true); buildT=0; holdT=0; });
 speedSlider.addEventListener('input',()=>{ spd=+speedSlider.value; $('speedV').textContent=spd.toFixed(2); });
 buildSlider.addEventListener('input',()=>{ setMode(false); holdT=0; buildT=+buildSlider.value; });
 
