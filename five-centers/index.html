@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<!-- 삼각형 오심(무게중심·내심·외심·수심·방심)을 흰 도화지 연필 소묘 + 네온 강조로 작도하는 5탭 통합 교구. 제미나이 초안의 호 좌표계 반전·방심 공식·수선 연장 버그를 교정한 판 -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>삼각형 오심(五心) 마스터피스 — 연필 소묘 실험판</title>
+<style>
+:root{
+  --paper:#f7f8fa; --ink:#3f434b; --ink2:#787c85; --muted:#9aa0aa;
+  --claude:#d9784f; --claudeG:#ff7a45;
+  --turq:#12b3b8;   --turqG:#1fd8d8;
+  --gold:#cf9d1e;   --goldG:#ffd24a;
+  --purple:#9b59b6; --purpleG:#c39bd3;
+  --green:#27ae60;  --greenG:#73c686;
+  --hand:"Segoe Print","Comic Sans MS","Bradley Hand",cursive;
+  --sans:"Nanum Gothic","Malgun Gothic",sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  min-height:100vh; color:var(--ink); font-family:var(--sans);
+  padding:20px 2vw 46px;
+  background:
+    radial-gradient(1200px 720px at 30% -8%, #ffffff 0%, transparent 60%),
+    radial-gradient(920px 640px at 88% 112%, #e9ecf1 0%, transparent 58%),
+    linear-gradient(158deg, #fbfbfc, #e7eaef 84%);
+}
+body::before{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  opacity:.05; mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+.wrap{position:relative; z-index:1; max-width:1280px; margin:0 auto}
+header{text-align:center; margin-bottom:12px}
+header h1{
+  font-family:var(--hand); font-weight:700;
+  font-size:clamp(1.5rem,3.2vw,2.3rem); letter-spacing:.01em; color:var(--ink);
+  text-shadow:0 1px 0 rgba(255,255,255,.8); transition: color 0.3s;
+}
+header .subtitle{ margin-top:6px; color:var(--ink2); font-family:var(--hand); font-size:clamp(.85rem,1.5vw,1.0rem); }
+
+.mode-tabs { display:flex; justify-content:center; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+.tab-btn {
+  font-family:var(--hand); font-size:1.0rem; padding:8px 16px;
+  border:2px solid rgba(120,126,140,.3); border-radius:12px; background:#fff;
+  color:var(--ink2); cursor:pointer; transition:all 0.2s; box-shadow:0 2px 4px rgba(60,66,80,.05);
+}
+.tab-btn:hover { background:#f7f8fa; transform:translateY(-1px); }
+.tab-btn.active.centroid { border-color:var(--gold); color:var(--gold); box-shadow:0 4px 12px rgba(207,157,30,.25); font-weight:700; }
+.tab-btn.active.incenter { border-color:var(--turq); color:var(--turq); box-shadow:0 4px 12px rgba(31,216,216,.25); font-weight:700; }
+.tab-btn.active.circum   { border-color:var(--purple); color:var(--purple); box-shadow:0 4px 12px rgba(155,89,182,.25); font-weight:700; }
+.tab-btn.active.ortho    { border-color:var(--claude); color:var(--claude); box-shadow:0 4px 12px rgba(255,122,69,.25); font-weight:700; }
+.tab-btn.active.ex       { border-color:var(--green); color:var(--green); box-shadow:0 4px 12px rgba(39,174,96,.25); font-weight:700; }
+
+.sheet{
+  position:relative; margin:0 auto; padding:12px;
+  background:#ffffff; border-radius:12px;
+  box-shadow:0 18px 44px rgba(60,66,80,.14), 0 2px 0 rgba(255,255,255,.7) inset;
+  border:1px solid rgba(120,126,140,.16);
+}
+.sheet::after{
+  content:""; position:absolute; inset:7px; border-radius:8px;
+  border:1px dashed rgba(120,126,140,.14); pointer-events:none;
+}
+.tape{
+  position:absolute; top:-12px; width:104px; height:30px; z-index:3;
+  transform:rotate(-4deg); opacity:.6; border-radius:2px;
+  box-shadow:0 3px 8px rgba(60,66,80,.12);
+  background:repeating-linear-gradient(90deg, rgba(255,255,255,.35) 0 6px, rgba(255,255,255,.12) 6px 12px);
+  mix-blend-mode:multiply; background-color:rgba(150,156,168,.4);
+}
+.tape.l{left:44px} .tape.r{right:44px; transform:rotate(5deg)}
+canvas{width:100%; height:auto; display:block; border-radius:8px; cursor:grab; touch-action:none}
+canvas.dragging{cursor:grabbing}
+
+.cards{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:18px auto 0; max-width:1280px }
+.card{
+  position:relative; padding:15px 16px 16px; border-radius:10px;
+  background:#ffffff; border:1.5px solid rgba(120,126,140,.26);
+  box-shadow:3px 5px 0 rgba(120,126,140,.08), 0 1px 0 rgba(255,255,255,.8) inset;
+  transition:all 0.3s;
+}
+.card:nth-child(1){transform:rotate(-1.1deg);}
+.card:nth-child(2){transform:rotate(.7deg);}
+.card:nth-child(3){transform:rotate(-.5deg);}
+.card::before{
+  content:""; position:absolute; left:14px; top:-7px; width:34px; height:12px; border-radius:6px;
+  background:var(--acc); box-shadow:0 0 12px var(--accg); opacity:.9; transition:background 0.3s, box-shadow 0.3s;
+}
+.card .lab{font-family:var(--hand); font-size:.9rem; color:var(--ink2); margin-bottom:6px}
+.card .val{
+  font-family:var(--hand); font-weight:700; font-size:clamp(1.1rem,1.9vw,1.4rem);
+  color:var(--acc); text-shadow:0 0 12px color-mix(in srgb,var(--accg) 40%,transparent);
+  line-height:1.2; min-height:1.3em; transition:color 0.3s;
+}
+.card .sub{font-family:var(--hand); font-size:.82rem; color:var(--muted); margin-top:5px}
+
+.controls{
+  display:flex; flex-wrap:wrap; align-items:center; justify-content:center;
+  gap:12px 20px; margin:20px auto 0; max-width:1280px;
+  padding:14px 18px; background:#ffffff; border-radius:12px;
+  border:1.5px solid rgba(120,126,140,.2); box-shadow:3px 5px 0 rgba(120,126,140,.07);
+}
+.btn{
+  font-family:var(--hand); font-size:1rem; color:var(--ink);
+  background:#fbfbfd; border:2px solid var(--ink); border-radius:14px;
+  padding:7px 18px; cursor:pointer; box-shadow:2px 3px 0 rgba(63,67,75,.85); transition:all .08s;
+}
+.btn:hover{transform:translate(-1px,-1px); box-shadow:3px 4px 0 rgba(63,67,75,.85)}
+.btn:active{transform:translate(1px,2px); box-shadow:1px 1px 0 rgba(63,67,75,.85)}
+.btn.primary{border-color:var(--claude); color:var(--claude); box-shadow:2px 3px 0 rgba(217,120,79,.55)}
+.ctl{display:flex; align-items:center; gap:9px; font-family:var(--hand); font-size:.95rem; color:var(--ink2)}
+.ctl input[type=range]{width:150px; accent-color:var(--turq); cursor:pointer}
+.ctl input[type=range].wide{width:210px}
+.ctl .v{min-width:44px; color:var(--ink); font-weight:700}
+.badge{
+  font-family:var(--hand); font-size:.9rem; padding:6px 15px; border-radius:14px;
+  border:2px solid var(--ink2); color:var(--ink2); transition:all 0.3s;
+}
+.badge.auto{border-color:var(--turq); color:var(--turq); box-shadow:0 0 12px rgba(31,216,216,.24);}
+footer{text-align:center; margin-top:16px; color:var(--muted); font-family:var(--hand); font-size:.9rem}
+
+@media (max-width:820px){
+  .cards{grid-template-columns:1fr}
+  .ctl input[type=range]{width:112px} .ctl input[type=range].wide{width:150px}
+  .tape{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>삼각형의 <span id="titleAcc" style="color:var(--gold);">오심 (五心)</span> 마스터피스</h1>
+    <p class="subtitle" id="subtitle">각 탭을 눌러 무게중심, 내심, 외심, 수심, 방심의 상세한 작도 과정을 감상하시오.</p>
+  </header>
+
+  <div class="mode-tabs">
+    <button class="tab-btn active centroid" data-target="centroid" onclick="switchMode('centroid')">무게중심 (G)</button>
+    <button class="tab-btn incenter" data-target="incenter" onclick="switchMode('incenter')">내심 (I)</button>
+    <button class="tab-btn circum" data-target="circum" onclick="switchMode('circum')">외심 (O)</button>
+    <button class="tab-btn ortho" data-target="ortho" onclick="switchMode('ortho')">수심 (H)</button>
+    <button class="tab-btn ex" data-target="ex" onclick="switchMode('ex')">방심 3개 (I_A, I_B, I_C)</button>
+  </div>
+
+  <div class="sheet">
+    <span class="tape l"></span>
+    <span class="tape r"></span>
+    <canvas id="stage" width="1200" height="720"></canvas>
+  </div>
+
+  <div class="cards" id="cards">
+    <div class="card">
+      <div class="lab" id="lab1">좌표</div>
+      <div class="val" id="val1">(0.00, 0.00)</div>
+      <div class="sub" id="sub1">교점 설명</div>
+    </div>
+    <div class="card">
+      <div class="lab" id="lab2">반지름/비율</div>
+      <div class="val" id="val2">0.00</div>
+      <div class="sub" id="sub2">세부 설명</div>
+    </div>
+    <div class="card">
+      <div class="lab" id="lab3">기하학 검증</div>
+      <div class="val" id="val3">0.00 = 0.00</div>
+      <div class="sub" id="sub3">검증 설명</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="playBtn" class="btn primary">⏸ 멈춤</button>
+    <button id="resetBtn" class="btn">↺ 다시 그리기</button>
+    <label class="ctl">그리는 속도
+      <input type="range" id="speed" min="0.3" max="2.5" step="0.05" value="1.0">
+      <span class="v" id="speedV">1.00</span>
+    </label>
+    <label class="ctl">작도 진행
+      <input type="range" id="build" class="wide" min="0" max="1" step="0.002" value="1">
+    </label>
+    <span class="badge auto" id="badge">자동 작도</span>
+  </div>
+
+  <footer>컴퍼스 호를 교차시켜 수직이등분선과 수선, 각의 이등분선을 직접 찾아내는 정통 작도법을 구현하였소.</footer>
+</div>
+
+<script>
+// 오심 통합 기하 엔진 + 흰 도화지 연필 렌더 + 모드별 선언적 타임라인. 호는 픽셀 좌표계(y반전) 기준으로 각도 변환하여 그린다
+'use strict';
+
+/* ── 전역 상태 및 좌표계 ─────────────────────────────── */
+const W=1200, H=720, U=70, OX=600, OY=360;
+let zoom=1.0, targetZoom=1.0; const ZMIN=0.4, ZMAX=2.4;
+const toPx = p => [OX + p[0]*U*zoom, OY - p[1]*U*zoom];
+const toU  = (px,py) => [(px-OX)/(U*zoom), (OY-py)/(U*zoom)];
+
+const INK='#3f434b', INK2='#787c85', PAPER='#fafbfc';
+const CLAUDE='#d9784f', CLAUDEG='#ff7a45';
+const TURQ='#12b3b8',  TURQG='#1fd8d8';
+const GOLD='#cf9d1e',  GOLDG='#ffd24a';
+const PURPLE='#9b59b6', PURPLEG='#c39bd3';
+const GREEN='#27ae60',  GREENG='#73c686';
+const ROSE='#d84f7d',   ROSEG='#ff7fae';
+const HAND='"Segoe Print","Comic Sans MS","Bradley Hand",cursive';
+
+const DEFAULT=[[-1.2, 3.2], [-3.8, -1.8], [4.2, -1.2]];
+let tri=DEFAULT.map(p=>p.slice());
+
+let mode = 'centroid';
+let DUR = 18.0;
+let playing = true, spd = 1.0, buildT = 0, holdT = 0, dragIdx = -1;
+
+/* ── 벡터 및 기하 헬퍼 ───────────────────────────────── */
+const sub=(p,q)=>[p[0]-q[0],p[1]-q[1]];
+const add=(p,q)=>[p[0]+q[0],p[1]+q[1]];
+const mul=(p,k)=>[p[0]*k,p[1]*k];
+const mid=(p,q)=>[(p[0]+q[0])/2,(p[1]+q[1])/2];
+const dist=(p,q)=>Math.hypot(p[0]-q[0],p[1]-q[1]);
+const vlen=p=>Math.hypot(p[0],p[1]);
+const norm=p=>{const l=vlen(p); return l>1e-9?[p[0]/l,p[1]/l]:[0,0];};
+const lerp=(p,q,t)=>[p[0]+(q[0]-p[0])*t, p[1]+(q[1]-p[1])*t];
+const cross=(p,q)=>p[0]*q[1]-p[1]*q[0];
+const perp=v=>[-v[1], v[0]];
+const rot=(v,a)=>[v[0]*Math.cos(a)-v[1]*Math.sin(a), v[0]*Math.sin(a)+v[1]*Math.cos(a)];
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+// 점 P에서 직선 UV까지 수직거리
+const distLine=(P,Uu,Vv)=>Math.abs(cross(sub(Vv,Uu),sub(P,Uu)))/Math.max(1e-9,dist(Uu,Vv));
+
+function getIso(P, d1, Q, d2){
+  const det = d1[0]*d2[1] - d1[1]*d2[0];
+  if(Math.abs(det)<1e-9) return [P[0],P[1]];
+  const t = ((Q[0]-P[0])*d2[1] - (Q[1]-P[1])*d2[0])/det;
+  return [P[0]+d1[0]*t, P[1]+d1[1]*t];
+}
+function proj(pt, a, b){
+  const dx = b[0]-a[0], dy = b[1]-a[1];
+  const div = dx*dx+dy*dy;
+  if(div<1e-9) return [a[0],a[1]];
+  const t = ((pt[0]-a[0])*dx + (pt[1]-a[1])*dy)/div;
+  return [a[0]+t*dx, a[1]+t*dy];
+}
+// 등반지름 두 원(중심 P·Q, 반지름 r)의 교점
+function circXeq(P, Q, r){
+  const d = dist(P, Q); if(d > 2*r || d < 1e-9) return null;
+  const M = mid(P, Q); const h = Math.sqrt(Math.max(0, r*r - (d/2)*(d/2)));
+  const dir = norm(sub(Q, P)); const prp = [-dir[1], dir[0]];
+  return [add(M, mul(prp, h)), add(M, mul(prp, -h))];
+}
+
+/* ── 통합 기하 엔진 ──────────────────────────────────── */
+function geom(){
+  const [A,B,C]=tri;
+  const a = Math.max(1e-9, dist(B,C)), b = Math.max(1e-9, dist(A,C)), c = Math.max(1e-9, dist(A,B));
+  const p = a+b+c, s = p/2;
+  const Area = Math.abs(cross(sub(B,A),sub(C,A)))/2;
+
+  // 1. 무게중심 (G)
+  const M_BC=mid(B,C), M_CA=mid(C,A), M_AB=mid(A,B);
+  const G = [(A[0]+B[0]+C[0])/3, (A[1]+B[1]+C[1])/3];
+
+  // 2. 내심 (I)
+  const I = [(a*A[0]+b*B[0]+c*C[0])/p, (a*A[1]+b*B[1]+c*C[1])/p];
+  const rI = Area / Math.max(1e-9, s);
+  const fI_BC = proj(I, B, C), fI_CA = proj(I, C, A), fI_AB = proj(I, A, B);
+
+  // 3. 외심 (O)
+  const O = getIso(M_BC, perp(sub(C,B)), M_CA, perp(sub(A,C)));
+  const R = dist(O, A);
+
+  // 4. 수심 (H)
+  const fA = proj(A, B, C), fB = proj(B, C, A), fC = proj(C, A, B);
+  const H = getIso(A, perp(sub(C,B)), B, perp(sub(A,C)));
+
+  // 5. 방심 — 음수 가중치가 각 대응 꼭짓점에 붙도록 (I_A는 A에, I_B는 B에, I_C는 C에)
+  const safe = d => Math.abs(d)<1e-9 ? 1e-9 : d;
+  const IA = [(-a*A[0]+b*B[0]+c*C[0])/safe(-a+b+c), (-a*A[1]+b*B[1]+c*C[1])/safe(-a+b+c)];
+  const IB = [( a*A[0]-b*B[0]+c*C[0])/safe( a-b+c), ( a*A[1]-b*B[1]+c*C[1])/safe( a-b+c)];
+  const IC = [( a*A[0]+b*B[0]-c*C[0])/safe( a+b-c), ( a*A[1]+b*B[1]-c*C[1])/safe( a+b-c)];
+  const rA = Area / Math.max(1e-9, s-a);
+  const rB = Area / Math.max(1e-9, s-b);
+  const rC = Area / Math.max(1e-9, s-c);
+
+  return { A,B,C, a,b,c, p,s, Area, M_BC,M_CA,M_AB, G, I,rI,fI_BC,fI_CA,fI_AB, O,R, H,fA,fB,fC, IA,IB,IC, rA,rB,rC };
+}
+
+/* ── 렌더러 및 텍스처 ─────────────────────────────── */
+const canvas=document.getElementById('stage');
+const ctx=canvas.getContext('2d');
+const dpr=window.devicePixelRatio||1;
+canvas.width=W*dpr; canvas.height=H*dpr; ctx.scale(dpr,dpr);
+
+const paper=document.createElement('canvas'); paper.width=W; paper.height=H;
+(function buildPaper(){
+  const p=paper.getContext('2d'); p.fillStyle=PAPER; p.fillRect(0,0,W,H);
+  const sheen=p.createRadialGradient(W*0.4,H*0.3,80, W*0.4,H*0.3, W*0.8);
+  sheen.addColorStop(0,'rgba(255,255,255,0.85)'); sheen.addColorStop(1,'rgba(255,255,255,0)');
+  p.fillStyle=sheen; p.fillRect(0,0,W,H);
+  let s=20260712; const rnd=()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; };
+  for(let i=0;i<6000;i++){
+    const x=rnd()*W, y=rnd()*H, r=0.5+rnd()*1.2, dark=rnd()<0.62;
+    p.globalAlpha=(dark?0.045:0.05)*rnd()+0.012; p.fillStyle=dark?'#c4c8d0':'#ffffff';
+    p.beginPath(); p.arc(x,y,r,0,Math.PI*2); p.fill();
+  }
+  p.globalAlpha=1; const vg=p.createRadialGradient(W/2,H/2,H*0.4, W/2,H/2, H*0.85);
+  vg.addColorStop(0,'rgba(70,74,82,0)'); vg.addColorStop(1,'rgba(70,74,82,0.08)');
+  p.fillStyle=vg; p.fillRect(0,0,W,H);
+})();
+
+function wob(Ppx,Qpx,o={}){
+  const w=o.w||2.2, al=o.alpha??1, rough=o.rough??0, over=o.over||0;
+  const dx=Qpx[0]-Ppx[0], dy=Qpx[1]-Ppx[1], L=Math.hypot(dx,dy)||1;
+  const ux=dx/L, uy=dy/L, nx=-uy, ny=ux;
+  const A=[Ppx[0]-ux*over, Ppx[1]-uy*over], Bp=[Qpx[0]+ux*over, Qpx[1]+uy*over];
+  const seg=rough>0?Math.max(6,Math.round((L+2*over)/20)):1;
+  let sseed = (Math.round((Ppx[0]*127.1+Ppx[1]*311.7+Qpx[0]*269.5+Qpx[1]*183.3)*97)>>>0)||1;
+  const rnd=()=>{ sseed=(sseed*1664525+1013904223)>>>0; return sseed/4294967296; };
+  const pts=[];
+  for(let i=0;i<=seg;i++){
+    const t=i/seg, off=rough>0?(rnd()*2-1)*rough*Math.sin(Math.PI*t):0;
+    pts.push([A[0]+(Bp[0]-A[0])*t + nx*off, A[1]+(Bp[1]-A[1])*t + ny*off]);
+  }
+  ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round';
+  if(o.blur){ctx.shadowColor=o.glow||o.color||INK; ctx.shadowBlur=o.blur;}
+  const passes=o.passes ?? (o.neon?1:2);
+  for(let pass=0; pass<passes; pass++){
+    const sh=pass?0.55:0; ctx.globalAlpha=al*(passes>1?(pass?0.4:0.94):1);
+    ctx.strokeStyle=o.color||INK; ctx.lineWidth=w+(pass?0.4:0);
+    ctx.beginPath(); ctx.moveTo(pts[0][0]+nx*sh,pts[0][1]+ny*sh);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0]+nx*sh,pts[i][1]+ny*sh);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+const inkU=(p,q,o)=>wob(toPx(p),toPx(q),o);
+const neonLine=(p,q,col,gl,a)=> {
+  wob(toPx(p),toPx(q),{color:gl, w:15, alpha:0.24*a, blur:24, glow:gl, neon:true, rough:0});
+  wob(toPx(p),toPx(q),{color:col, w:5.5,alpha:0.88*a, blur:13, glow:gl, neon:true, rough:0});
+  wob(toPx(p),toPx(q),{color:'#ffffff', w:1.5, alpha:0.5*a, blur:5, glow:gl, neon:true, rough:0});
+};
+function dashedLine(pU, qU, alpha, col) {
+  if(alpha<=0) return; const p1=toPx(pU), p2=toPx(qU);
+  ctx.save(); ctx.globalAlpha=alpha; ctx.strokeStyle=col||INK; ctx.lineWidth=2.0; ctx.setLineDash([5, 5]);
+  ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke(); ctx.restore();
+}
+function drawRightAngle(footU, p1U, IU, alpha, col) {
+  if(alpha<=0) return; const f=toPx(footU), p1=toPx(p1U), ic=toPx(IU);
+  let vLine=norm(sub(p1, f)), vI=norm(sub(ic, f)); const s=14;
+  ctx.save(); ctx.globalAlpha=alpha; ctx.strokeStyle=col||INK; ctx.lineWidth=1.5; ctx.beginPath();
+  ctx.moveTo(f[0]+vLine[0]*s, f[1]+vLine[1]*s); ctx.lineTo(f[0]+vLine[0]*s+vI[0]*s, f[1]+vLine[1]*s+vI[1]*s);
+  ctx.lineTo(f[0]+vI[0]*s, f[1]+vI[1]*s); ctx.stroke(); ctx.restore();
+}
+function drawCircle(Cu, rUnits, local, col, glow) {
+  const C=toPx(Cu), r=rUnits*U*zoom;
+  ctx.save(); ctx.globalAlpha=clamp(local); ctx.strokeStyle=col; ctx.lineWidth=2.5; ctx.shadowColor=glow; ctx.shadowBlur=12;
+  ctx.beginPath(); ctx.arc(C[0], C[1], r, -Math.PI/2, -Math.PI/2 + (Math.PI*2 * clamp(local))); ctx.stroke();
+  if(local>0.5){ ctx.globalAlpha=(local-0.5)*0.15; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(C[0], C[1], r, 0, Math.PI*2); ctx.fill(); }
+  ctx.restore();
+}
+/* 컴퍼스 호 — aStart(단위좌표계 각)에서 sweep(부호 있는 각)만큼 local 비율로.
+   캔버스는 y가 뒤집히므로 각도를 음수로 변환해 그린다 (제미나이판 거울반전 버그 교정) */
+function compassArc(Cu, rUnits, aStart, sweep, local, alpha=1, w=1.6, col=INK2){
+  const C=toPx(Cu), r=rUnits*U*zoom;
+  const now=aStart+sweep*clamp(local);
+  ctx.save(); ctx.lineCap='round'; ctx.globalAlpha=alpha; ctx.strokeStyle=col; ctx.lineWidth=w;
+  if(col!==INK2){ ctx.shadowColor=col; ctx.shadowBlur=8; }
+  ctx.beginPath(); ctx.arc(C[0],C[1], r, -aStart, -now, sweep>0); ctx.stroke(); ctx.restore();
+}
+/* 두 목표점 T1→T2를 잇는 완전한 호 (짧은 방향 + 양끝 pad) */
+function arcBetween(Cc, rUnits, T1, T2, pad, local, alpha, w, col){
+  const a1=Math.atan2(T1[1]-Cc[1], T1[0]-Cc[0]);
+  const a2=Math.atan2(T2[1]-Cc[1], T2[0]-Cc[0]);
+  let d=a2-a1; while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI;
+  const s=d<0?-1:1;
+  const total=Math.min(Math.abs(d)+2*pad, Math.PI*1.9)*s;
+  compassArc(Cc, rUnits, a1-s*pad, total, local, alpha, w, col);
+}
+/* 같은 각 표시 — 소호 (두 방향 d1→d2 사이, 색 있는 호) */
+function angleMark(V, d1, d2, rm, col, local, alpha){
+  arcBetween(V, rm, add(V,mul(d1,rm)), add(V,mul(d2,rm)), 0, local, alpha, 2.0, col);
+}
+/* 같은 각 표시 — 눈금 n개 (중간 방향 dm 주변, 반지름 rm 소호를 가로지름) */
+function angleTicks(V, dm, rm, n, col, alpha){
+  for(let j=0;j<n;j++){
+    const d=rot(dm,(j-(n-1)/2)*0.12);
+    inkU(add(V,mul(d,rm-0.14)), add(V,mul(d,rm+0.14)), {color:col,w:2.2,alpha,rough:0,passes:1,blur:6,glow:col});
+  }
+}
+function udot(pU,r,col,blur,al){ if(r<=0)return; const p=toPx(pU); ctx.save(); ctx.globalAlpha=al??1; ctx.fillStyle=col; if(blur){ctx.shadowColor=col; ctx.shadowBlur=blur;} ctx.beginPath(); ctx.arc(p[0],p[1],r,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+function ring(pU,r,col,w,al,glow){ if(r<=0)return; const p=toPx(pU); ctx.save(); ctx.globalAlpha=al??1; ctx.strokeStyle=col; ctx.lineWidth=w||2; if(glow){ctx.shadowColor=col; ctx.shadowBlur=10;} ctx.beginPath(); ctx.arc(p[0],p[1],r,0,Math.PI*2); ctx.stroke(); ctx.restore(); }
+function text(s,pU,dx,dy,o={}){ const p=toPx(pU); ctx.save(); ctx.globalAlpha=o.alpha??1; ctx.fillStyle=o.color||INK; ctx.font=`${o.weight||'700'} ${o.size||17}px ${HAND}`; ctx.textAlign=o.align||'center'; ctx.textBaseline='middle'; if(o.blur){ctx.shadowColor=o.glow||o.color; ctx.shadowBlur=o.blur;} ctx.fillText(s, p[0]+dx, p[1]+dy); ctx.restore(); }
+/* 아래첨자 라벨 (I_A → I·작은A) */
+function subLabel(base,subt,pU,dx,dy,o={}){
+  const p=toPx(pU); ctx.save();
+  ctx.globalAlpha=o.alpha??1; ctx.fillStyle=o.color||INK; ctx.textBaseline='middle';
+  if(o.blur){ctx.shadowColor=o.glow||o.color; ctx.shadowBlur=o.blur;}
+  ctx.font=`700 ${o.size||17}px ${HAND}`; ctx.textAlign='left';
+  ctx.fillText(base, p[0]+dx, p[1]+dy);
+  const bw=ctx.measureText(base).width;
+  ctx.font=`700 ${(o.size||17)*0.72}px ${HAND}`;
+  ctx.fillText(subt, p[0]+dx+bw+1, p[1]+dy+(o.size||17)*0.28);
+  ctx.restore();
+}
+const popScale=(age,dur)=>{ if(age<0)return 0; if(age>=dur)return 1; const u=age/dur, p=u-1, c1=1.9; return 1+(c1+1)*p*p*p+c1*p*p; };
+function flashPulse(cU,age,col,gl,o={}){
+  const dur=o.dur||0.5; if(age<0||age>dur) return; const u=age/dur, P=toPx(cU), R=(o.r0||9)+(o.r1||34)*u;
+  ctx.save(); ctx.globalAlpha=(1-u)*(o.a??0.9); ctx.strokeStyle=gl||col; ctx.lineWidth=(o.w||2.6)*(1-u*0.5); ctx.shadowColor=gl||col; ctx.shadowBlur=16;
+  ctx.beginPath(); ctx.arc(P[0],P[1],R,0,Math.PI*2); ctx.stroke();
+  if(u<0.4){ ctx.globalAlpha=(1-u/0.4)*0.7; ctx.fillStyle=col; ctx.shadowBlur=20; ctx.beginPath(); ctx.arc(P[0],P[1],(o.r0||9)*(1+u*0.5),0,Math.PI*2); ctx.fill(); }
+  ctx.restore();
+}
+/* 세 번 연속 번쩍 */
+function tripleFlash(cU, T, t0, col, gl){
+  [t0, t0+0.45, t0+0.9].forEach(t=>flashPulse(cU, T-t, col, gl, {r0:11,r1:48,dur:0.42,w:3,a:0.98}));
+}
+function drawGrid(){
+  ctx.save(); ctx.lineWidth=1; ctx.strokeStyle='#9aa0aa'; const ue=U*zoom;
+  for(let gx=Math.floor((0-OX)/ue);gx<=Math.ceil((W-OX)/ue);gx++){ if(gx===0) continue; ctx.globalAlpha=.09; const [x]=toPx([gx,0]); ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke(); }
+  for(let gy=Math.floor((OY-H)/ue);gy<=Math.ceil((OY-0)/ue);gy++){ if(gy===0) continue; ctx.globalAlpha=.09; const [,y]=toPx([0,gy]); ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
+  ctx.globalAlpha=.22; ctx.lineWidth=1.2; ctx.strokeStyle='#7c828c';
+  ctx.beginPath();ctx.moveTo(0,OY);ctx.lineTo(W,OY);ctx.stroke(); ctx.beginPath();ctx.moveTo(OX,0);ctx.lineTo(OX,H);ctx.stroke(); ctx.restore();
+}
+
+/* ── 모드별 작도 함수 ─────────────────────────────── */
+/* 무게중심 — 승인된 대본: 완전한 호 3쌍 → 보조선 → 중점 D·E·F 톡톡톡 → 보조 페이드 → 중선 네온 → G 삼연속 번쩍 */
+function drawCentroid(g, ph, T) {
+  const sides=[{p:g.A,q:g.B,m:g.M_AB,n:'D'},{p:g.B,q:g.C,m:g.M_BC,n:'E'},{p:g.C,q:g.A,m:g.M_CA,n:'F'}];
+  const meds=[{v:g.A,m:g.M_BC,c:CLAUDE,gl:CLAUDEG},{v:g.B,m:g.M_CA,c:TURQ,gl:TURQG},{v:g.C,m:g.M_AB,c:GOLD,gl:GOLDG}];
+  const auxFade=1-ph(11.2,12.0);
+  if(auxFade>0.001){
+    sides.forEach((sd,i)=>{
+      const arcL=ph(6.0+i*0.85, 6.0+i*0.85+0.8);
+      if(arcL<=0) return;
+      const r=dist(sd.p,sd.q)*0.6, X=circXeq(sd.p,sd.q,r);
+      if(!X) return;
+      arcBetween(sd.p, r, X[0], X[1], 0.25, arcL, 0.66*auxFade);
+      arcBetween(sd.q, r, X[0], X[1], 0.25, arcL, 0.66*auxFade);
+      const bisL=ph(8.6+i*0.4, 8.6+i*0.4+0.4);
+      if(bisL>0){
+        const e1=lerp(X[0],X[1],-0.06), e2=lerp(X[0],X[1],-0.06+1.12*bisL);
+        inkU(e1,e2,{color:INK2,w:1.7,alpha:0.72*auxFade,rough:0,passes:1});
+      }
+    });
+  }
+  meds.forEach((md,i)=>{
+    const l=ph(12.1+i*0.9, 12.1+i*0.9+0.8);
+    if(l>0) neonLine(md.v, lerp(md.v,md.m,l), md.c, md.gl, 1);
+  });
+  sides.forEach((sd,i)=>{
+    const age=T-(9.9+i*0.4); if(age<0) return;
+    const sc=popScale(age,0.5);
+    flashPulse(sd.m, age, INK2, INK2, {r0:6,r1:22,dur:0.45,w:2,a:0.65});
+    udot(sd.m,3.6*sc,INK,0,1); ring(sd.m,6*sc,INK2,1.6,0.9);
+    if(age>0.14){const out=norm(sub(sd.m,g.G)); text(sd.n, sd.m, out[0]*14, -out[1]*14-2, {color:INK,size:16,alpha:clamp((age-0.14)/0.2)});}
+  });
+  if(T>=14.9){
+    const sc=popScale(T-14.9,0.45);
+    udot(g.G,8.5*sc,GOLD,18,1); udot(g.G,3.8*sc,'#fff7e0',8,1); ring(g.G,11*sc,GOLDG,2.2,1,true);
+    tripleFlash(g.G, T, 14.9, GOLD, GOLDG);
+    if(T>=16.2) text('G',g.G,17,-17,{color:GOLD,size:23,weight:'700',blur:13,glow:GOLDG,alpha:clamp((T-16.2)/0.25)});
+  }
+}
+
+/* 내심 — 꼭짓점 호 → 교차 호 → 이등분선(대변까지) → I 삼연속 번쩍 → 수선 발·내접원 */
+function drawIncenter(g, ph, T) {
+  const P=[
+    {v:g.A, s1:g.B, s2:g.C, c:CLAUDE, gl:CLAUDEG},
+    {v:g.B, s1:g.C, s2:g.A, c:TURQ,   gl:TURQG},
+    {v:g.C, s1:g.A, s2:g.B, c:GOLD,   gl:GOLDG}
+  ];
+  const auxFade=1-ph(16.2,17.0);
+  P.forEach((pt, i) => {
+    const tB = 6 + i*3.5;
+    const r1 = Math.min(1.5, 0.45*Math.min(dist(pt.v,pt.s1), dist(pt.v,pt.s2)));
+    const p1 = add(pt.v, mul(norm(sub(pt.s1, pt.v)), r1));
+    const p2 = add(pt.v, mul(norm(sub(pt.s2, pt.v)), r1));
+    if(auxFade>0.001){
+      const arc1L = ph(tB, tB+0.8);
+      if(arc1L>0){
+        arcBetween(pt.v, r1, p1, p2, 0.22, arc1L, 0.7*auxFade);
+        if(arc1L>0.6){ udot(p1,2.6,INK2,0,0.8*auxFade); udot(p2,2.6,INK2,0,0.8*auxFade); }
+      }
+      const r2 = dist(p1, p2)*0.7;
+      const X = circXeq(p1, p2, r2);
+      const arc2L = ph(tB+1.0, tB+1.8);
+      if(arc2L>0 && X) {
+        const crossP = dist(X[0], pt.v) > dist(X[1], pt.v) ? X[0] : X[1];   // 꼭짓점에서 먼 쪽(안쪽 전방)
+        const aX1 = Math.atan2(crossP[1]-p1[1], crossP[0]-p1[0]);
+        const aX2 = Math.atan2(crossP[1]-p2[1], crossP[0]-p2[0]);
+        compassArc(p1, r2, aX1-0.3, 0.6, arc2L, 0.6*auxFade);
+        compassArc(p2, r2, aX2-0.3, 0.6, arc2L, 0.6*auxFade);
+        if(arc2L>0.8) udot(crossP, 3, INK, 0, clamp((arc2L-0.8)*5)*auxFade);
+      }
+    }
+    const lineL = ph(tB+2.0, tB+3.0);
+    if(lineL>0){
+      const Ta = getIso(pt.v, sub(g.I, pt.v), pt.s1, sub(pt.s2, pt.s1));   // 이등분선이 대변과 만나는 점
+      neonLine(pt.v, lerp(pt.v, Ta, lineL), pt.c, pt.gl, 1);
+    }
+  });
+  if(T >= 17) {
+    const sc = popScale(T-17, 0.45);
+    udot(g.I, 8.5*sc, TURQ, 18, 1); udot(g.I, 3.8*sc, '#eafffb', 8, 1); ring(g.I, 11*sc, TURQG, 2.2, 1, true);
+    tripleFlash(g.I, T, 17, TURQ, TURQG);
+    if(T>=18.1) text('I', g.I, 17, -17, {color:TURQ, size:23, weight:'700', blur:13, glow:TURQG, alpha:clamp((T-18.1)/0.25)});
+  }
+  const rL = ph(18.4, 20.2);
+  if(rL>0) {
+    dashedLine(g.I, lerp(g.I, g.fI_BC, rL), 1, TURQ); dashedLine(g.I, lerp(g.I, g.fI_CA, rL), 1, TURQ); dashedLine(g.I, lerp(g.I, g.fI_AB, rL), 1, TURQ);
+    if(rL>0.85) { drawRightAngle(g.fI_BC, g.B, g.I, 1, INK2); drawRightAngle(g.fI_CA, g.C, g.I, 1, INK2); drawRightAngle(g.fI_AB, g.A, g.I, 1, INK2); }
+  }
+  const cL = ph(21, 24.5); if(cL>0) drawCircle(g.I, g.rI, cL, TURQ, TURQG);
+}
+
+/* 외심 — 완전한 호 렌즈 3쌍 → 수직이등분선(가시 범위 스윕) → O 삼연속 번쩍 → 반지름·외접원 */
+function drawCircum(g, ph, T) {
+  const P=[
+    {p1:g.B, p2:g.C, m:g.M_BC, c:CLAUDE, gl:CLAUDEG},
+    {p1:g.C, p2:g.A, m:g.M_CA, c:TURQ,   gl:TURQG},
+    {p1:g.A, p2:g.B, m:g.M_AB, c:GOLD,   gl:GOLDG}
+  ];
+  const auxFade=1-ph(17.6,18.6);
+  P.forEach((pt, i) => {
+    const tC = 6 + i*4.0;
+    const r = dist(pt.p1, pt.p2) * 0.65;
+    const X = circXeq(pt.p1, pt.p2, r);
+    if(auxFade>0.001 && X){
+      const arcL = ph(tC, tC+1.5);
+      if(arcL>0){
+        arcBetween(pt.p1, r, X[0], X[1], 0.3, arcL, 0.7*auxFade);
+        arcBetween(pt.p2, r, X[0], X[1], 0.3, arcL, 0.7*auxFade);
+        if(arcL>0.9){ const a=clamp((arcL-0.9)*10)*auxFade; udot(X[0],3,INK,0,a); udot(X[1],3,INK,0,a); }
+      }
+    }
+    const lineL = ph(tC+2.0, tC+3.2);
+    if(lineL>0) {
+      const dir0 = norm(sub(g.O, pt.m));
+      const dir = (Math.abs(dir0[0])<1e-9 && Math.abs(dir0[1])<1e-9) ? norm(perp(sub(pt.p2, pt.p1))) : dir0;
+      const L = dist(pt.m, g.O) + 2.5;                      // O를 지나 조금 더 — 화면 안 스윕
+      const L1 = add(pt.m, mul(dir, L)), L2 = add(pt.m, mul(dir, -L));
+      neonLine(L1, lerp(L1, L2, lineL), pt.c, pt.gl, 1);
+      if(lineL>0.8) drawRightAngle(pt.m, pt.p1, add(pt.m, perp(sub(pt.p2, pt.p1))), 1, INK2);
+    }
+  });
+  if(T >= 19) {
+    const sc = popScale(T-19, 0.45);
+    udot(g.O, 8.5*sc, PURPLE, 18, 1); udot(g.O, 3.8*sc, '#f6ecfb', 8, 1); ring(g.O, 11*sc, PURPLEG, 2.2, 1, true);
+    tripleFlash(g.O, T, 19, PURPLE, PURPLEG);
+    if(T>=20.3) text('O', g.O, 17, -17, {color:PURPLE, size:23, weight:'700', blur:13, glow:PURPLEG, alpha:clamp((T-20.3)/0.25)});
+  }
+  const rL = ph(20.4, 22.2);
+  if(rL>0) { dashedLine(g.O, lerp(g.O, g.A, rL), 1, PURPLE); dashedLine(g.O, lerp(g.O, g.B, rL), 1, PURPLE); dashedLine(g.O, lerp(g.O, g.C, rL), 1, PURPLE); }
+  const cL = ph(23, 27.5); if(cL>0) drawCircle(g.O, g.R, cL, PURPLE, PURPLEG);
+}
+
+/* 수심 — 대변 연장선(점선) → 꼭짓점 호로 직선 위 두 점 → 교차 호 → 수선 → 수선의 발 번쩍(H_A·H_B·H_C) → H 삼연속 번쩍 */
+function drawOrtho(g, ph, T) {
+  const P=[
+    {v:g.A, p1:g.B, p2:g.C, f:g.fA, lab:'A', c:CLAUDE, gl:CLAUDEG},
+    {v:g.B, p1:g.C, p2:g.A, f:g.fB, lab:'B', c:TURQ,   gl:TURQG},
+    {v:g.C, p1:g.A, p2:g.B, f:g.fC, lab:'C', c:GOLD,   gl:GOLDG}
+  ];
+  const auxFade=1-ph(18.7,19.5);
+  P.forEach((pt, i) => {
+    const tH = 6 + i*4.4;
+    const h = dist(pt.v, pt.f), r1 = h + 0.8;
+    const sideDir = norm(sub(pt.p2, pt.p1));
+    const Ls = dist(pt.p1, pt.p2);
+    const dHalf = Math.sqrt(Math.max(0, r1*r1 - h*h));
+    const X1 = add(pt.f, mul(sideDir, dHalf)), X2 = add(pt.f, mul(sideDir, -dHalf));
+    // 대변의 연장선 — 발·호 교점이 변 밖이면 그 너머까지 점선으로 (작도 내내 유지)
+    const extLcl = ph(tH, tH+0.5);
+    if(extLcl>0){
+      const sOf = Q => (Q[0]-pt.p1[0])*sideDir[0] + (Q[1]-pt.p1[1])*sideDir[1];
+      const lo = Math.min(0, sOf(X1), sOf(X2), sOf(pt.f)) - 0.5;
+      const hi = Math.max(Ls, sOf(X1), sOf(X2), sOf(pt.f)) + 0.5;
+      if(lo < -0.01) dashedLine(pt.p1, lerp(pt.p1, add(pt.p1, mul(sideDir, lo)), extLcl), 0.65, INK2);
+      if(hi > Ls+0.01) dashedLine(pt.p2, lerp(pt.p2, add(pt.p1, mul(sideDir, hi)), extLcl), 0.65, INK2);
+    }
+    if(auxFade>0.001){
+      const arc1L = ph(tH+0.5, tH+1.5);
+      if(arc1L>0) {
+        arcBetween(pt.v, r1, X1, X2, 0.18, arc1L, 0.6*auxFade);
+        if(arc1L>0.8){ const a=clamp((arc1L-0.8)*5)*auxFade; udot(X1,3,INK,0,a); udot(X2,3,INK,0,a); }
+      }
+      const r2 = dist(X1, X2)*0.6;
+      const Ys = circXeq(X1, X2, r2);
+      const arc2L = ph(tH+1.6, tH+2.6);
+      if(arc2L>0 && Ys) {
+        const Y = dist(Ys[0], pt.v) > dist(Ys[1], pt.v) ? Ys[0] : Ys[1];
+        const ay1 = Math.atan2(Y[1]-X1[1], Y[0]-X1[0]), ay2 = Math.atan2(Y[1]-X2[1], Y[0]-X2[0]);
+        compassArc(X1, r2, ay1-0.3, 0.6, arc2L, 0.5*auxFade);
+        compassArc(X2, r2, ay2-0.3, 0.6, arc2L, 0.5*auxFade);
+        if(arc2L>0.9) udot(Y, 3, INK, 0, clamp((arc2L-0.9)*10)*auxFade);
+      }
+    }
+    const lineL = ph(tH+2.8, tH+3.8);
+    if(lineL>0) {
+      const dir = norm(sub(pt.f, pt.v));
+      const projH = (g.H[0]-pt.v[0])*dir[0] + (g.H[1]-pt.v[1])*dir[1];   // H의 수선 위 위치
+      const lo = Math.min(0, projH) - 0.7, hi = Math.max(h, projH) + 0.7;
+      const S = add(pt.v, mul(dir, lo)), E = add(pt.v, mul(dir, hi));
+      neonLine(S, lerp(S, E, lineL), pt.c, pt.gl, 1);
+      if(lineL>0.8) drawRightAngle(pt.f, pt.p1, pt.v, 1, INK2);
+    }
+    // 수선의 발 — 수선이 대변(연장선)에 닿는 순간 번쩍 + 라벨 H_A·H_B·H_C
+    const fAge = T-(tH+3.55);
+    if(fAge>=0){
+      const sc=popScale(fAge,0.4);
+      flashPulse(pt.f, fAge, pt.c, pt.gl, {r0:6,r1:24,dur:0.45,w:2.2,a:0.8});
+      udot(pt.f, 3.4*sc, INK, 0, 1);
+      ring(pt.f, 6*sc, pt.c, 1.6, 0.9);
+      if(fAge>0.15){
+        const away=norm(sub(pt.f, pt.v));            // 수선 진행 방향 너머(변 바깥쪽)에 라벨
+        subLabel('H', pt.lab, pt.f, away[0]*20-8, -away[1]*20+2, {color:pt.c, size:15, alpha:clamp((fAge-0.15)/0.2)});
+      }
+    }
+  });
+  if(T >= 19.8) {
+    const sc = popScale(T-19.8, 0.45);
+    udot(g.H, 8.5*sc, CLAUDE, 18, 1); udot(g.H, 3.8*sc, '#fff1ea', 8, 1); ring(g.H, 11*sc, CLAUDEG, 2.2, 1, true);
+    tripleFlash(g.H, T, 19.8, CLAUDE, CLAUDEG);
+    if(T>=21.1) text('H', g.H, 17, -17, {color:CLAUDE, size:23, weight:'700', blur:13, glow:CLAUDEG, alpha:clamp((T-21.1)/0.25)});
+  }
+}
+
+/* 방심 — 변 연장(점선) → 각 꼭짓점 외각을 컴퍼스로 이등분(같은 각 소호+눈금) → 외각이등분선 3개가 쌍쌍이 만나 방심 3개 → 방접원 */
+function drawExcenter(g, ph, T) {
+  const extL = ph(6, 8);
+  if(extL>0) {
+    const ext=(P0,P1)=>add(P1, mul(norm(sub(P1,P0)), 8));
+    dashedLine(g.B, lerp(g.B, ext(g.A,g.B), extL), 0.6, INK2); dashedLine(g.C, lerp(g.C, ext(g.A,g.C), extL), 0.6, INK2);
+    dashedLine(g.A, lerp(g.A, ext(g.B,g.A), extL), 0.6, INK2); dashedLine(g.C, lerp(g.C, ext(g.B,g.C), extL), 0.6, INK2);
+    dashedLine(g.A, lerp(g.A, ext(g.C,g.A), extL), 0.6, INK2); dashedLine(g.B, lerp(g.B, ext(g.C,g.B), extL), 0.6, INK2);
+  }
+  // 꼭짓점별 외각 — u1=한 변 방향, u2=다른 변의 연장 방향, w=외각 이등분 방향 (+w·−w가 각각 방심을 지남)
+  const VX=[
+    {V:g.A, u1:norm(sub(g.B,g.A)), u2:norm(sub(g.A,g.C)), plus:g.IC, minus:g.IB, c:CLAUDE, gl:CLAUDEG, n:1},
+    {V:g.B, u1:norm(sub(g.C,g.B)), u2:norm(sub(g.B,g.A)), plus:g.IA, minus:g.IC, c:TURQ,   gl:TURQG,   n:2},
+    {V:g.C, u1:norm(sub(g.A,g.C)), u2:norm(sub(g.C,g.B)), plus:g.IB, minus:g.IA, c:GOLD,   gl:GOLDG,   n:3},
+  ];
+  const auxFade=1-ph(18.6,19.4);
+  VX.forEach((vx,i)=>{
+    const t0=8.3+i*3.4;
+    const {V,u1,u2}=vx;
+    const w=norm(add(u1,u2));
+    const r1=Math.min(1.6, 0.45*Math.min(dist(V,tri[(i+1)%3]), dist(V,tri[(i+2)%3])));
+    const p1=add(V,mul(u1,r1)), p2=add(V,mul(u2,r1));
+    if(auxFade>0.001){
+      const a1L=ph(t0,t0+0.8);
+      if(a1L>0){
+        arcBetween(V,r1,p1,p2,0.2,a1L,0.7*auxFade);
+        if(a1L>0.6){ udot(p1,2.6,INK2,0,0.8*auxFade); udot(p2,2.6,INK2,0,0.8*auxFade); }
+      }
+      const r2=dist(p1,p2)*0.7, X=circXeq(p1,p2,r2);
+      const a2L=ph(t0+0.9,t0+1.7);
+      if(a2L>0 && X){
+        const crossP=((X[0][0]-V[0])*w[0]+(X[0][1]-V[1])*w[1] > (X[1][0]-V[0])*w[0]+(X[1][1]-V[1])*w[1]) ? X[0] : X[1];
+        const aX1=Math.atan2(crossP[1]-p1[1],crossP[0]-p1[0]), aX2=Math.atan2(crossP[1]-p2[1],crossP[0]-p2[0]);
+        compassArc(p1,r2,aX1-0.3,0.6,a2L,0.6*auxFade);
+        compassArc(p2,r2,aX2-0.3,0.6,a2L,0.6*auxFade);
+        if(a2L>0.8) udot(crossP,3,INK,0,clamp((a2L-0.8)*5)*auxFade);
+      }
+    }
+    // 이등분된 두 외각이 서로 같음 — 같은 반지름 소호 + 같은 개수 눈금 (꼭짓점마다 1·2·3개, 페이드 없이 유지)
+    const mkL=ph(t0+1.8,t0+2.4);
+    if(mkL>0){
+      const rm=r1*0.62;
+      angleMark(V,u1,w,rm,vx.c,mkL,0.95);
+      angleMark(V,w,u2,rm,vx.c,mkL,0.95);
+      if(mkL>0.6){
+        const tA=0.95*clamp((mkL-0.6)/0.4);
+        angleTicks(V,norm(add(u1,w)),rm,vx.n,vx.c,tA);
+        angleTicks(V,norm(add(w,u2)),rm,vx.n,vx.c,tA);
+      }
+    }
+    // 외각 이등분선 — 꼭짓점에서 양방향 스윕, 각 방향의 방심 너머까지
+    const lnL=ph(t0+2.4,t0+3.4);
+    if(lnL>0){
+      const tP=(vx.plus[0]-V[0])*w[0]+(vx.plus[1]-V[1])*w[1]+1.2;
+      const tM=(vx.minus[0]-V[0])*w[0]+(vx.minus[1]-V[1])*w[1]-1.2;
+      neonLine(V, lerp(V, add(V,mul(w,tP)), lnL), vx.c, vx.gl, 0.8);
+      neonLine(V, lerp(V, add(V,mul(w,tM)), lnL), vx.c, vx.gl, 0.8);
+    }
+  });
+  // 방심 3개 — 외각 이등분선의 쌍별 교점에서 삼연속 번쩍
+  const EX=[
+    {c0:g.IA, col:GREEN,  gl:GREENG,  r:g.rA, lab:'A', tp:19.7,  dx:20},
+    {c0:g.IB, col:PURPLE, gl:PURPLEG, r:g.rB, lab:'B', tp:20.15, dx:-42},
+    {c0:g.IC, col:ROSE,   gl:ROSEG,   r:g.rC, lab:'C', tp:20.6,  dx:20}
+  ];
+  EX.forEach((e,i)=>{
+    if(T>=e.tp){
+      const sc=popScale(T-e.tp,0.5);
+      udot(e.c0,8.5*sc,e.col,18,1); ring(e.c0,11*sc,e.gl,2.2,1,true);
+      tripleFlash(e.c0,T,e.tp,e.col,e.gl);
+      if(T>=e.tp+0.3) subLabel('I',e.lab,e.c0,e.dx,-20,{color:e.col,size:19,blur:8,glow:e.gl,alpha:clamp((T-e.tp-0.3)/0.25)});
+    }
+    const cL=ph(21.6+i*1.0,24.6+i*1.0);
+    if(cL>0) drawCircle(e.c0,e.r,cL,e.col,e.gl);
+  });
+}
+
+/* ── 메인 그리기 함수 ─────────────────────────────── */
+function draw(){
+  zoom += (targetZoom - zoom) * 0.08;
+  const T = buildT * DUR; const ph = (a,b) => clamp((T-a)/(b-a));
+  ctx.clearRect(0,0,W,H); ctx.drawImage(paper,0,0,W,H); drawGrid();
+
+  const g = geom();
+  // 자동 줌아웃 — 방심·수심 모드에서 핵심 점들이 모두 화면에 들어오도록 (드래그에도 추종)
+  if(mode==='ex' || mode==='ortho'){
+    const FITMIN=0.2;
+    const pts = mode==='ex' ? [g.IA,g.IB,g.IC,g.A,g.B,g.C] : [g.H,g.fA,g.fB,g.fC,g.A,g.B,g.C];
+    let need=1.0;
+    for(const P of pts){
+      need=Math.min(need, (W/2-60)/Math.max(1e-9,Math.abs(P[0])*U), (H/2-60)/Math.max(1e-9,Math.abs(P[1])*U));
+    }
+    targetZoom=Math.max(FITMIN, Math.min(1, need));
+  }
+  const lift = ph(5.0, 5.8);
+  if(lift>0){
+    const pa=toPx(g.A), pb=toPx(g.B), pc=toPx(g.C);
+    ctx.save(); ctx.shadowColor=`rgba(20,24,33,${0.55*lift})`; ctx.shadowBlur=24; ctx.shadowOffsetX=7; ctx.shadowOffsetY=18;
+    ctx.strokeStyle=INK; ctx.lineWidth=4.6; ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(pa[0],pa[1]); ctx.lineTo(pb[0],pb[1]); ctx.lineTo(pc[0],pc[1]); ctx.closePath(); ctx.stroke();
+    ctx.shadowColor=`rgba(20,24,33,${0.30*lift})`; ctx.shadowBlur=36; ctx.shadowOffsetY=26; ctx.stroke(); ctx.restore();
+  }
+
+  // 삼각형 세 변 — 곧은 회색 연필, 스르르
+  const sides = [ {p:g.A, q:g.B}, {p:g.B, q:g.C}, {p:g.C, q:g.A} ];
+  sides.forEach((sd,i)=>{
+    const local = ph(2.5 + i*0.8, 2.5 + i*0.8 + 0.7);
+    if(local>0) inkU(sd.p, lerp(sd.p, sd.q, local), {color:INK, w:5.2, alpha:.98, over:local>=1?6:0, rough:0});
+  });
+
+  if(mode === 'centroid') drawCentroid(g, ph, T);
+  else if(mode === 'incenter') drawIncenter(g, ph, T);
+  else if(mode === 'circum') drawCircum(g, ph, T);
+  else if(mode === 'ortho') drawOrtho(g, ph, T);
+  else drawExcenter(g, ph, T);
+
+  // 꼭짓점 A·B·C — 순서대로 번쩍 튕김
+  const vcols=[CLAUDE,TURQ,GOLD], vgls=[CLAUDEG,TURQG,GOLDG], names=['A','B','C'];
+  tri.forEach((V,i)=>{
+    const age=T-(0.35+i*0.7); if(age<0) return; const sc=popScale(age,0.55);
+    flashPulse(V, age, vcols[i], vgls[i], {r0:9,r1:36,dur:0.55,w:2.8,a:0.95});
+    udot(V, 6.5*sc, INK, 0, 1); ring(V, 10*sc, INK2, 2.2, 0.92);
+    if(age>0.14) text(names[i], V, 24, -24, {color:INK, size:21, weight:'700', alpha:clamp((age-0.14)/0.2)});
+  });
+}
+
+/* ── UI 및 카드 업데이트 ─────────────────────────────── */
+const $=id=>document.getElementById(id);
+const setTxt=(id,v)=>{ const e=$(id); if(e.__v!==v){e.__v=v; e.textContent=v;} };
+const num=x=>(Math.abs(x)<5e-3?0:x).toFixed(2).replace('-','−');
+
+function updateCards(){
+  const g = geom();
+  if(mode === 'centroid') {
+    const r1=dist(g.A,g.G)/Math.max(1e-9,dist(g.G,g.M_BC));
+    const r2=dist(g.B,g.G)/Math.max(1e-9,dist(g.G,g.M_CA));
+    const r3=dist(g.C,g.G)/Math.max(1e-9,dist(g.G,g.M_AB));
+    setTxt('lab1', '무게중심 G 좌표'); setTxt('val1', `(${num(g.G[0])}, ${num(g.G[1])})`); setTxt('sub1', '세 중선의 교점 · G = (A+B+C)/3');
+    setTxt('lab2', '중선 내분비'); setTxt('val2', '2 : 1'); setTxt('sub2', '꼭짓점 → G → 중점');
+    setTxt('lab3', '검증 · 세 중선의 비 (드래그해도 불변)'); setTxt('val3', `${r1.toFixed(2)} · ${r2.toFixed(2)} · ${r3.toFixed(2)}`); setTxt('sub3', '모두 2.00 이면 정확하오');
+  } else if(mode === 'incenter') {
+    const d1=distLine(g.I,g.B,g.C), d2=distLine(g.I,g.C,g.A), d3=distLine(g.I,g.A,g.B);
+    setTxt('lab1', '내심 I 좌표'); setTxt('val1', `(${num(g.I[0])}, ${num(g.I[1])})`); setTxt('sub1', '세 내각 이등분선의 교점');
+    setTxt('lab2', '내접원 반지름 r'); setTxt('val2', num(g.rI)); setTxt('sub2', 'r = 넓이 ÷ s');
+    setTxt('lab3', '검증 · 내심에서 세 변까지 거리'); setTxt('val3', `${num(d1)} = ${num(d2)} = ${num(d3)}`); setTxt('sub3', '세 거리가 r와 같으면 정확하오');
+  } else if(mode === 'circum') {
+    setTxt('lab1', '외심 O 좌표'); setTxt('val1', `(${num(g.O[0])}, ${num(g.O[1])})`); setTxt('sub1', '세 변의 수직이등분선의 교점');
+    setTxt('lab2', '외접원 반지름 R'); setTxt('val2', num(g.R)); setTxt('sub2', 'O에서 세 꼭짓점까지 거리');
+    setTxt('lab3', '검증 · OA = OB = OC'); setTxt('val3', `${num(dist(g.O,g.A))} = ${num(dist(g.O,g.B))} = ${num(dist(g.O,g.C))}`); setTxt('sub3', '세 거리가 같으면 정확하오');
+  } else if(mode === 'ortho') {
+    const ang=(v,f,p,q)=>{ const d1=norm(sub(f,v)), d2=norm(sub(q,p)); const dd=Math.abs(d1[0]*d2[0]+d1[1]*d2[1]); return (Math.acos(clamp(dd,0,1))*180/Math.PI).toFixed(1); };
+    setTxt('lab1', '수심 H 좌표'); setTxt('val1', `(${num(g.H[0])}, ${num(g.H[1])})`); setTxt('sub1', '세 수선의 교점 (둔각이면 삼각형 밖)');
+    setTxt('lab2', '수선 길이 h_a'); setTxt('val2', num(dist(g.A,g.fA))); setTxt('sub2', 'A에서 BC에 내린 수선');
+    setTxt('lab3', '검증 · 수선 ⊥ 대변'); setTxt('val3', `${ang(g.A,g.fA,g.B,g.C)}° = ${ang(g.B,g.fB,g.C,g.A)}° = ${ang(g.C,g.fC,g.A,g.B)}°`); setTxt('sub3', '모두 90.0° 이면 정확하오');
+  } else {
+    setTxt('lab1', '방심 I_A 좌표'); setTxt('val1', `(${num(g.IA[0])}, ${num(g.IA[1])})`); setTxt('sub1', '방심 3개 중 ∠A 대응');
+    setTxt('lab2', '방접원 반지름 3종'); setTxt('val2', `${num(g.rA)} · ${num(g.rB)} · ${num(g.rC)}`); setTxt('sub2', 'r = 넓이 ÷ (s−해당 변)');
+    setTxt('lab3', '검증 · I_A에서 변 BC까지 거리 = r_A'); setTxt('val3', `${num(distLine(g.IA,g.B,g.C))} = ${num(g.rA)}`); setTxt('sub3', '같으면 방접원이 정확히 접하오');
+  }
+}
+
+function switchMode(m) {
+  mode = m;
+  document.querySelectorAll('.tab-btn').forEach(b => { b.className = 'tab-btn'; if(b.dataset.target === m) b.classList.add('active', m); });
+  const titleAcc = $('titleAcc'), subEl = $('subtitle');
+  const setCardAcc = (col, glow) => { document.querySelectorAll('.card').forEach(c => { c.style.setProperty('--acc', `var(${col})`); c.style.setProperty('--accg', `var(${glow})`); }); };
+
+  targetZoom = 1.0;
+
+  if(m==='centroid') {
+    titleAcc.style.color='var(--gold)'; titleAcc.textContent='무게중심 (Centroid)'; subEl.textContent='양 끝점에서 완전한 호를 그려 중점 D·E·F를 찾고, 꼭짓점과 이어 무게중심 G를 작도하오.';
+    setCardAcc('--gold', '--goldG'); DUR = 18.0;
+  } else if(m==='incenter') {
+    titleAcc.style.color='var(--turq)'; titleAcc.textContent='내심 (Incenter)'; subEl.textContent='꼭짓점에서 호를 긋고, 교점에서 다시 호를 겹쳐 내각의 이등분선과 내심 I를 찾소.';
+    setCardAcc('--turq', '--turqG'); DUR = 26.0;
+  } else if(m==='circum') {
+    titleAcc.style.color='var(--purple)'; titleAcc.textContent='외심 (Circumcenter)'; subEl.textContent='선분의 양 끝에서 넉넉한 반지름의 호를 그려 교차점을 잇는 수직이등분선을 작도하오.';
+    setCardAcc('--purple', '--purpleG'); DUR = 29.0;
+  } else if(m==='ortho') {
+    titleAcc.style.color='var(--claude)'; titleAcc.textContent='수심 (Orthocenter)'; subEl.textContent='대변을 연장선까지 점선으로 늘리고, 호를 교차시켜 수선을 세워 수선의 발 H_A·H_B·H_C와 수심 H를 찾소.';
+    setCardAcc('--claude', '--claudeG'); DUR = 24.0;
+  } else {
+    titleAcc.style.color='var(--green)'; titleAcc.textContent='방심 3개 (Excenters)'; subEl.textContent='변의 연장선 위에서 외각을 컴퍼스로 이등분하고(같은 각 표시), 세 외각이등분선이 쌍쌍이 만나 방심 3개와 방접원을 이루오.';
+    setCardAcc('--green', '--greenG'); DUR = 28.0; targetZoom = 0.55;
+  }
+
+  setMode(true); buildT=0; holdT=0;   // 삼각형은 유지 — 드래그한 모양 그대로 다른 심을 관찰
+}
+
+/* ── 인터랙션 및 애니메이션 루프 ─────────────────────── */
+const buildSlider=$('build'), speedSlider=$('speed');
+function setMode(auto){ playing=auto; $('playBtn').textContent=playing?'⏸ 멈춤':'▶ 재생'; refreshBadge(); }
+function refreshBadge(){ const b=$('badge'); b.textContent=playing?'자동 작도':'수동 조작'; b.classList.toggle('auto',playing); }
+$('playBtn').addEventListener('click',()=>setMode(!playing));
+$('resetBtn').addEventListener('click',()=>{ tri=DEFAULT.map(p=>p.slice()); targetZoom=(mode==='ex')?0.55:1.0; setMode(true); buildT=0; holdT=0; });
+speedSlider.addEventListener('input',()=>{ spd=+speedSlider.value; $('speedV').textContent=spd.toFixed(2); });
+buildSlider.addEventListener('input',()=>{ setMode(false); holdT=0; buildT=+buildSlider.value; });
+
+function pick(px,py){
+  const [ux,uy]=toU(px,py); let best=-1, bd=28/(U*zoom);
+  tri.forEach((V,i)=>{ const d=dist(V,[ux,uy]); if(d<bd){bd=d;best=i;} });
+  return best;
+}
+function toLocal(e){ const r=canvas.getBoundingClientRect(); return [(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height]; }
+canvas.addEventListener('pointerdown',e=>{ const [px,py]=toLocal(e); const i=pick(px,py); if(i<0) return; dragIdx=i; canvas.classList.add('dragging'); canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointermove',e=>{
+  if(dragIdx<0) return; const [px,py]=toLocal(e);
+  let [ux,uy]=toU(px,py); ux=Math.max(-12,Math.min(12,ux)); uy=Math.max(-8,Math.min(8,uy));
+  const prev=tri[dragIdx].slice(); tri[dragIdx]=[ux,uy]; const [A,B,C]=tri;
+  if(Math.abs(cross(sub(B,A),sub(C,A)))/2 < 0.6) tri[dragIdx]=prev;
+});
+const endDrag=()=>{ dragIdx=-1; canvas.classList.remove('dragging'); };
+canvas.addEventListener('pointerup',endDrag); canvas.addEventListener('pointercancel',endDrag);
+canvas.addEventListener('wheel',e=>{ e.preventDefault(); targetZoom=Math.max(ZMIN,Math.min(ZMAX, targetZoom*Math.exp(-e.deltaY*0.0011))); },{passive:false});
+
+let lastT=null;
+function frame(t){
+  if(lastT===null) lastT=t; const dt=Math.min((t-lastT)/1000,0.1); lastT=t;
+  if(dragIdx>=0){ buildT=1; }
+  else if(playing){
+    if(holdT>0){ holdT-=dt; if(holdT<=0) buildT=0; }
+    else { buildT+=dt/DUR*spd; if(buildT>=1){ buildT=1; holdT=2.5; } }
+  } else { buildT=+buildSlider.value; }
+  draw(); updateCards();
+  if(dragIdx<0 && playing) buildSlider.value=buildT.toFixed(4);
+  requestAnimationFrame(frame);
+}
+switchMode('centroid'); requestAnimationFrame(frame);
+</script>
+</body>
+</html>
